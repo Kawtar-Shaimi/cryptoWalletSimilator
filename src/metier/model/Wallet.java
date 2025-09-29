@@ -24,3 +24,4 @@ public abstract class Wallet {
 	public BigDecimal getBalance() { return balance; }
 	public Instant getCreatedAt() { return createdAt; }
 	public void setBalance(BigDecimal balance) { this.balance = balance; }
+}
