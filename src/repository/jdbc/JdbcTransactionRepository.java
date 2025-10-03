@@ -11,7 +11,7 @@ import java.util.Optional;
 import metier.enums.FeePriority;
 import metier.enums.TransactionStatus;
 import metier.model.Transaction;
-import util.Database;
+import config.Database;
 import util.LoggerProvider;
 
 public class JdbcTransactionRepository implements repository.TransactionRepository {

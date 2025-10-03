@@ -2,7 +2,7 @@ package ui;
 
 import java.util.Scanner;
 import java.util.logging.Logger;
-import util.Database;
+import config.Database;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;

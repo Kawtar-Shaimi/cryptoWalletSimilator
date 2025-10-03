@@ -1,14 +1,15 @@
-package util;
+package config;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.logging.Logger;
+import util.LoggerProvider;
 
 /**
  * Singleton pour gérer la connexion JDBC PostgreSQL.
- * Les paramètres sont à adapter (URL, user, password).
+ * Utilise DatabaseConfig pour récupérer les paramètres de configuration.
  */
 public class Database {
 
@@ -21,9 +22,9 @@ public class Database {
 	private volatile boolean initialized;
 
 	private Database() {
-		this.url = System.getProperty("db.url", "jdbc:postgresql://localhost:5432/cryptowallet");
-		this.user = System.getProperty("db.user", "postgres");
-		this.password = System.getProperty("db.password", "password");
+		this.url = DatabaseConfig.getUrl();
+		this.user = DatabaseConfig.getUser();
+		this.password = DatabaseConfig.getPassword();
 		try {
 			// Charge le driver PostgreSQL si disponible (JDBC 4+ le fait souvent automatiquement)
 			Class.forName("org.postgresql.Driver");
@@ -103,5 +104,3 @@ public class Database {
 		}
 	}
 }
-
-

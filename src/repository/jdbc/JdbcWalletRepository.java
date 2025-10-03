@@ -13,7 +13,7 @@ import metier.enums.CryptoType;
 import metier.model.BitcoinWallet;
 import metier.model.EthereumWallet;
 import metier.model.Wallet;
-import util.Database;
+import config.Database;
 import util.LoggerProvider;
 
 public class JdbcWalletRepository implements repository.WalletRepository {
