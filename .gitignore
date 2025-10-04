@@ -1,0 +1,25 @@
+# Fichiers de configuration sensibles
+src/config/config.properties
+
+# Fichiers de base de données locales
+*.db
+*.sqlite
+*.h2.db
+
+# Logs
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Compilation
+*.class
+bin/
+build/
+target/

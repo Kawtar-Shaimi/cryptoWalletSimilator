@@ -7,10 +7,7 @@ import java.sql.SQLException;
 import java.util.logging.Logger;
 import util.LoggerProvider;
 
-/**
- * Singleton pour gérer la connexion JDBC PostgreSQL.
- * Utilise DatabaseConfig pour récupérer les paramètres de configuration.
- */
+
 public class Database {
 
 	private static final Logger LOGGER = LoggerProvider.getLogger(Database.class.getName());
@@ -22,15 +19,32 @@ public class Database {
 	private volatile boolean initialized;
 
 	private Database() {
-		this.url = DatabaseConfig.getUrl();
-		this.user = DatabaseConfig.getUser();
-		this.password = DatabaseConfig.getPassword();
+		this.url = ConfigManager.getDatabaseUrl();
+		this.user = ConfigManager.getDatabaseUser();
+		this.password = ConfigManager.getDatabasePassword();
+		
+		// Détecte automatiquement le type de base de données et charge le driver approprié
+		loadDatabaseDriver();
+	}
+	
+	
+	private void loadDatabaseDriver() {
 		try {
-			// Charge le driver PostgreSQL si disponible (JDBC 4+ le fait souvent automatiquement)
-			Class.forName("org.postgresql.Driver");
-			LOGGER.info("Driver PostgreSQL chargé");
+			if (url.contains("postgresql")) {
+				Class.forName("org.postgresql.Driver");
+				LOGGER.info("Driver PostgreSQL chargé");
+			} else if (url.contains("h2")) {
+				Class.forName("org.h2.Driver");
+				LOGGER.info("Driver H2 Database chargé");
+			} else if (url.contains("mysql")) {
+				Class.forName("com.mysql.cj.jdbc.Driver");
+				LOGGER.info("Driver MySQL chargé");
+			} else {
+				LOGGER.info("Type de base de données non reconnu, utilisation du driver par défaut");
+			}
 		} catch (ClassNotFoundException e) {
-			LOGGER.info("Driver PostgreSQL non trouvé dans le classpath (peut être normal avec JDBC 4+)");
+			LOGGER.warning("Driver de base de données non trouvé: " + e.getMessage() + 
+			              " (peut être normal avec JDBC 4+)");
 		}
 	}
 

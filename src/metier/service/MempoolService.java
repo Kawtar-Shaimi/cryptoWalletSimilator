@@ -45,6 +45,62 @@ public class MempoolService {
 	}
 
 	/**
+	 * Retourne les informations de debug du mempool
+	 * @return DebugInfo contenant toutes les données pour l'affichage
+	 */
+	public DebugInfo getDebugInfo() {
+		List<TransactionSummary> summaries = new ArrayList<>();
+		for (int i = 0; i < pending.size(); i++) {
+			Transaction t = pending.get(i);
+			summaries.add(new TransactionSummary(
+				i + 1, 
+				t.getId(), 
+				t.getFeeAmount(), 
+				t.getFromAddress()
+			));
+		}
+		return new DebugInfo(pending.size(), summaries);
+	}
+	
+	/**
+	 * Classe pour encapsuler les informations de debug
+	 */
+	public static class DebugInfo {
+		private final int totalTransactions;
+		private final List<TransactionSummary> transactions;
+		
+		public DebugInfo(int totalTransactions, List<TransactionSummary> transactions) {
+			this.totalTransactions = totalTransactions;
+			this.transactions = transactions;
+		}
+		
+		public int getTotalTransactions() { return totalTransactions; }
+		public List<TransactionSummary> getTransactions() { return transactions; }
+	}
+	
+	/**
+	 * Classe pour résumer une transaction pour le debug
+	 */
+	public static class TransactionSummary {
+		private final int position;
+		private final String id;
+		private final BigDecimal feeAmount;
+		private final String fromAddress;
+		
+		public TransactionSummary(int position, String id, BigDecimal feeAmount, String fromAddress) {
+			this.position = position;
+			this.id = id;
+			this.feeAmount = feeAmount;
+			this.fromAddress = fromAddress;
+		}
+		
+		public int getPosition() { return position; }
+		public String getId() { return id; }
+		public BigDecimal getFeeAmount() { return feeAmount; }
+		public String getFromAddress() { return fromAddress; }
+	}
+
+	/**
 	 * Calcule la position hypothétique si une transaction avait un certain fee,
 	 * sans modifier le contenu actuel du mempool.
 	 */
@@ -67,13 +123,31 @@ public class MempoolService {
 
 	public void generateRandomPending(int count) {
 		Random rnd = new Random();
+		// Sauvegarde les transactions existantes de l'utilisateur
+		List<Transaction> userTransactions = pending.stream()
+			.filter(t -> !isRandomTransaction(t))
+			.collect(Collectors.toList());
+		
 		pending.clear();
+		
+		// Restaure les transactions de l'utilisateur
+		pending.addAll(userTransactions);
+		
+		// Ajoute les transactions aléatoires
 		for (int i = 0; i < count; i++) {
 			Transaction t = new Transaction(anonymAddr(rnd), anonymAddr(rnd), new BigDecimal("0.01"), FeePriority.STANDARD, UUID.randomUUID().toString());
 			BigDecimal fee = new BigDecimal(rnd.nextInt(90) + 1).multiply(new BigDecimal("0.00000010"));
 			t.setFeeAmount(fee);
 			pending.add(t);
 		}
+	}
+	
+	/**
+	 * Vérifie si une transaction est générée aléatoirement (adresse courte)
+	 */
+	private boolean isRandomTransaction(Transaction t) {
+		// Les transactions aléatoires ont des adresses courtes (10 caractères + 0x)
+		return t.getFromAddress().length() <= 12 && t.getToAddress().length() <= 12;
 	}
 
 	private String anonymAddr(Random rnd) {

@@ -26,6 +26,16 @@ public abstract class Wallet {
         this.transactions = new ArrayList<metier.model.Transaction>();
 	}
 
+	// Constructeur pour la reconstruction depuis la base de données
+	protected Wallet(String id, CryptoType cryptoType, String address, BigDecimal balance, Instant createdAt) {
+		this.id = id;
+		this.cryptoType = cryptoType;
+		this.address = address;
+		this.balance = balance;
+		this.createdAt = createdAt;
+        this.transactions = new ArrayList<metier.model.Transaction>();
+	}
+
 	public String getId() { return id; }
 	public CryptoType getCryptoType() { return cryptoType; }
 	public String getAddress() { return address; }

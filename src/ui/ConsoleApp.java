@@ -7,19 +7,21 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 
-import metier.enums.CryptoType;
+
 import metier.enums.FeePriority;
 import metier.model.Transaction;
 import metier.model.Wallet;
 import metier.service.FeeCalculator;
 import metier.service.FeeCalculatorFactory;
 import metier.service.MempoolService;
-import metier.service.WalletFactory;
+
+import metier.service.WalletService;
+
 import repository.TransactionRepository;
 import repository.WalletRepository;
 import repository.jdbc.JdbcTransactionRepository;
 import repository.jdbc.JdbcWalletRepository;
-import util.ValidationUtils;
+
 
 /**
  * Couche de présentation: point d'entrée console et squelette du menu.
@@ -31,6 +33,8 @@ public class ConsoleApp {
 	private static final WalletRepository walletRepo = new JdbcWalletRepository();
 	private static final TransactionRepository txRepo = new JdbcTransactionRepository();
 	private static final MempoolService mempool = new MempoolService();
+
+	private static final WalletService walletService = new WalletService(walletRepo, txRepo);
 	private static Transaction lastCreatedTx;
 
 	public static void main(String[] args) {
@@ -45,15 +49,21 @@ public class ConsoleApp {
 					createWallet(scanner);
 					break;
 				case "2":
-					createTransaction(scanner);
+					addFunds(scanner);
 					break;
 				case "3":
-					showMyPosition();
+					checkBalance(scanner);
 					break;
 				case "4":
-					compareFees(scanner);
+					createTransaction(scanner);
 					break;
 				case "5":
+					showMyPosition();
+					break;
+				case "6":
+					compareFees(scanner);
+					break;
+				case "7":
 					showMempool();
 					break;
 				case "0":
@@ -72,60 +82,118 @@ public class ConsoleApp {
 		System.out.println();
 		System.out.println("=== Crypto Wallet Simulator ===");
 		System.out.println("1. Creer un wallet crypto");
-		System.out.println("2. Creer une nouvelle transaction");
-		System.out.println("3. Voir ma position dans le mempool");
-		System.out.println("4. Comparer les 3 niveaux de frais");
-		System.out.println("5. Consulter l'etat actuel du mempool");
+		System.out.println("2. Ajouter des fonds à un wallet");
+		System.out.println("3. Consulter la balance d'un wallet");
+		System.out.println("4. Creer une nouvelle transaction");
+		System.out.println("5. Voir ma position dans le mempool");
+		System.out.println("6. Comparer les 3 niveaux de frais");
+		System.out.println("7. Consulter l'etat actuel du mempool");
 		System.out.println("0. Quitter");
 		System.out.print("Votre choix: ");
 	}
 
 	private static void createWallet(Scanner scanner) {
 		System.out.println("Type de wallet (1=BITCOIN, 2=ETHEREUM): ");
-		String t = scanner.nextLine();
-		CryptoType type = "1".equals(t) ? CryptoType.BITCOIN : CryptoType.ETHEREUM;
-		Wallet w = WalletFactory.createWallet(type);
-		walletRepo.save(w);
-		System.out.println("Wallet créé: id=" + w.getId() + ", type=" + w.getCryptoType() + ", address=" + w.getAddress());
-		LOGGER.info("Wallet créé avec succès et persisté: " + w.getId());
+		String typeInput = scanner.nextLine();
+		
+		WalletService.ServiceResult<Wallet> result = walletService.createWallet(typeInput);
+		
+		if (result.isSuccess()) {
+			System.out.println(result.getMessage());
+			LOGGER.info("Wallet créé avec succès et persisté: " + result.getData().getId());
+		} else {
+			System.out.println("Erreur: " + result.getMessage());
+		}
+	}
+
+	private static void addFunds(Scanner scanner) {
+		System.out.print("ID du wallet: ");
+		String walletId = scanner.nextLine();
+		
+		// Vérifier d'abord si le wallet existe et afficher sa balance
+		WalletService.ServiceResult<Wallet> walletResult = walletService.findWallet(walletId);
+		if (!walletResult.isSuccess()) {
+			System.out.println("Erreur: " + walletResult.getMessage());
+			return;
+		}
+		
+		Wallet wallet = walletResult.getData();
+		System.out.println("Balance actuelle: " + wallet.getBalance());
+		
+		System.out.print("Montant à ajouter (>0): ");
+		String amountStr = scanner.nextLine();
+		
+		WalletService.ServiceResult<Wallet> result = walletService.addFunds(walletId, amountStr);
+		
+		if (result.isSuccess()) {
+			System.out.println(result.getMessage());
+		} else {
+			System.out.println("Erreur: " + result.getMessage());
+		}
+	}
+
+	private static void checkBalance(Scanner scanner) {
+		System.out.print("ID du wallet: ");
+		String walletId = scanner.nextLine();
+		
+		WalletService.ServiceResult<Wallet> result = walletService.findWallet(walletId);
+		
+		if (result.isSuccess()) {
+			Wallet wallet = result.getData();
+			System.out.println("=== Informations du Wallet ===");
+			System.out.println("ID: " + wallet.getId());
+			System.out.println("Type: " + wallet.getCryptoType());
+			System.out.println("Adresse: " + wallet.getAddress());
+			System.out.println("Balance: " + wallet.getBalance());
+			System.out.println("Créé le: " + wallet.getCreatedAt());
+		} else {
+			System.out.println("Erreur: " + result.getMessage());
+		}
 	}
 
 	private static void createTransaction(Scanner scanner) {
 		System.out.print("ID du wallet source: ");
 		String walletId = scanner.nextLine();
-		Wallet w = walletRepo.findById(walletId).orElse(null);
-		if (w == null) {
-			System.out.println("Wallet introuvable");
+		
+		// Vérifier le wallet et afficher la balance
+		WalletService.ServiceResult<Wallet> walletResult = walletService.findWallet(walletId);
+		if (!walletResult.isSuccess()) {
+			System.out.println("Erreur: " + walletResult.getMessage());
 			return;
 		}
+		
+		Wallet wallet = walletResult.getData();
+		System.out.println("Balance actuelle: " + wallet.getBalance());
+		
 		System.out.print("Adresse destination: ");
-		String to = scanner.nextLine();
-		if (w.getCryptoType() == CryptoType.ETHEREUM && !ValidationUtils.isValidEthereumAddress(to)) {
-			System.out.println("Adresse ETH invalide");
-			return;
-		}
-		if (w.getCryptoType() == CryptoType.BITCOIN && !ValidationUtils.isValidBitcoinAddress(to)) {
-			System.out.println("Adresse BTC invalide");
-			return;
-		}
+		String toAddress = scanner.nextLine();
+		
 		System.out.print("Montant (>0): ");
-		String amtStr = scanner.nextLine();
-		BigDecimal amount;
-		try { amount = new BigDecimal(amtStr); } catch (Exception e) { System.out.println("Montant invalide"); return; }
-		if (!ValidationUtils.isPositive(amount)) { System.out.println("Montant doit être > 0"); return; }
+		String amountStr = scanner.nextLine();
+		
 		System.out.print("Priorité (1=ECONOMIQUE, 2=STANDARD, 3=RAPIDE): ");
-		String p = scanner.nextLine();
-		FeePriority pr = "1".equals(p) ? FeePriority.ECONOMIQUE : ("3".equals(p) ? FeePriority.RAPIDE : FeePriority.STANDARD);
+		String priorityInput = scanner.nextLine();
 
-		Transaction tx = new Transaction(w.getAddress(), to, amount, pr, w.getId());
-		FeeCalculator calc = FeeCalculatorFactory.forType(w.getCryptoType());
-		BigDecimal fee = calc.calculateFee(tx, w, pr);
-		tx.setFeeAmount(fee);
-		txRepo.save(tx);
-		mempool.addTransaction(tx);
-		lastCreatedTx = tx;
-		System.out.println("Transaction créée: id=" + tx.getId() + ", fee=" + fee);
-		LOGGER.info("Transaction PENDING persistée: id=" + tx.getId());
+		// Utiliser le WalletService pour créer la transaction
+		WalletService.ServiceResult<Transaction> result = walletService.createTransaction(walletId, toAddress, amountStr, priorityInput);
+		
+		if (result.isSuccess()) {
+			Transaction tx = result.getData();
+			mempool.addTransaction(tx);
+			lastCreatedTx = tx;
+			
+			// Recharger le wallet depuis la base pour vérifier la mise à jour
+			WalletService.ServiceResult<Wallet> updatedWalletResult = walletService.findWallet(walletId);
+			if (updatedWalletResult.isSuccess()) {
+				System.out.println(result.getMessage());
+				System.out.println("Balance mise à jour en base: " + updatedWalletResult.getData().getBalance());
+			} else {
+				System.out.println(result.getMessage());
+			}
+			LOGGER.info("Transaction PENDING persistée: id=" + tx.getId());
+		} else {
+			System.out.println("Erreur: " + result.getMessage());
+		}
 	}
 
 	private static void showMyPosition() {
@@ -133,11 +201,33 @@ public class ConsoleApp {
 			System.out.println("Aucune transaction récente. Créez d'abord une transaction.");
 			return;
 		}
+		
+		// Debug temporaire
+		System.out.println("ID de votre transaction: " + lastCreatedTx.getId());
+		
+		// Affichage des informations de debug du mempool
+		MempoolService.DebugInfo debugInfo = mempool.getDebugInfo();
+		System.out.println("=== DEBUG MEMPOOL ===");
+		System.out.println("Nombre total de transactions: " + debugInfo.getTotalTransactions());
+		for (MempoolService.TransactionSummary summary : debugInfo.getTransactions()) {
+			System.out.println(String.format("%d. ID: %s | Fee: %s | From: %s", 
+				summary.getPosition(), summary.getId(), summary.getFeeAmount(), summary.getFromAddress()));
+		}
+		System.out.println("======================");
+		
 		int pos = mempool.computePosition(lastCreatedTx);
 		List<Transaction> sorted = mempool.getPendingSortedByFeeDesc();
 		Duration eta = mempool.estimateConfirmationTime(lastCreatedTx);
-		System.out.println("Votre transaction est en position " + pos + " sur " + sorted.size());
-		System.out.println("Temps estimé: " + eta.toMinutes() + " minutes");
+		
+		if (pos == -1) {
+			System.out.println("Transaction non trouvée dans le mempool. ID: " + lastCreatedTx.getId());
+			System.out.println("Frais de votre transaction: " + lastCreatedTx.getFeeAmount());
+		} else {
+			System.out.println("Votre transaction est en position " + pos + " sur " + sorted.size());
+			System.out.println("Temps estimé: " + eta.toMinutes() + " minutes");
+			System.out.println("ID de votre transaction: " + lastCreatedTx.getId());
+			System.out.println("Frais de votre transaction: " + lastCreatedTx.getFeeAmount());
+		}
 	}
 
 	private static void compareFees(Scanner scanner) {
@@ -145,8 +235,14 @@ public class ConsoleApp {
 			System.out.println("Aucune transaction récente. Créez d'abord une transaction.");
 			return;
 		}
-		Wallet w = walletRepo.findById(lastCreatedTx.getWalletId()).orElse(null);
-		if (w == null) { System.out.println("Wallet introuvable"); return; }
+		
+		WalletService.ServiceResult<Wallet> result = walletService.findWallet(lastCreatedTx.getWalletId());
+		if (!result.isSuccess()) {
+			System.out.println("Erreur: " + result.getMessage());
+			return;
+		}
+		
+		Wallet w = result.getData();
 		FeeCalculator calc = FeeCalculatorFactory.forType(w.getCryptoType());
 
 		System.out.println("\n+----------------------+--------------+----------+----------+");
@@ -164,13 +260,30 @@ public class ConsoleApp {
 	}
 
 	private static void showMempool() {
+		// Génère des transactions aléatoires sans supprimer les transactions utilisateur
 		mempool.generateRandomPending(15);
 		List<Transaction> sorted = mempool.getPendingSortedByFeeDesc();
 		System.out.println("\n=== ÉTAT DU MEMPOOL ===");
 		System.out.println("Transactions en attente : " + sorted.size());
-		for (Transaction t : sorted) {
-			String tag = (lastCreatedTx != null && t.getId().equals(lastCreatedTx.getId())) ? ">>> VOTRE TX: " : "";
-			System.out.println(tag + t.getFromAddress() + " -> " + t.getToAddress() + " | frais=" + t.getFeeAmount());
+		
+		boolean userTxFound = false;
+		for (int i = 0; i < sorted.size(); i++) {
+			Transaction t = sorted.get(i);
+			boolean isUserTx = (lastCreatedTx != null && t.getId().equals(lastCreatedTx.getId()));
+			if (isUserTx) {
+				userTxFound = true;
+				System.out.println(String.format("%d. >>> VOTRE TRANSACTION (Position %d) <<<", 
+					i + 1, i + 1));
+				System.out.println("    " + t.getFromAddress() + " -> " + t.getToAddress() + " | frais=" + t.getFeeAmount());
+			} else {
+				System.out.println(String.format("%d. %s -> %s | frais=%s", 
+					i + 1, t.getFromAddress(), t.getToAddress(), t.getFeeAmount()));
+			}
+		}
+		
+		if (lastCreatedTx != null && !userTxFound) {
+			System.out.println("\n[WARNING] Votre transaction n'apparait pas dans le mempool actuel.");
+			System.out.println("ID de votre transaction : " + lastCreatedTx.getId());
 		}
 	}
 }

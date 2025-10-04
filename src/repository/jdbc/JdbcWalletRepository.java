@@ -20,6 +20,14 @@ public class JdbcWalletRepository implements repository.WalletRepository {
 
 	@Override
 	public void save(Wallet wallet) {
+		if (findById(wallet.getId()).isPresent()) {
+			updateWallet(wallet);
+		} else {
+			insertWallet(wallet);
+		}
+	}
+	
+	private void insertWallet(Wallet wallet) {
 		String sql = "INSERT INTO wallets(id, type, address, balance, created_at) VALUES (?, ?, ?, ?, ?)";
 		try (Connection c = Database.getInstance().getConnection();
 			 PreparedStatement ps = c.prepareStatement(sql)) {
@@ -33,6 +41,21 @@ public class JdbcWalletRepository implements repository.WalletRepository {
 			LoggerProvider.getLogger(getClass().getName()).severe(e.getMessage());
 		}
 	}
+	
+	private void updateWallet(Wallet wallet) {
+		String sql = "UPDATE wallets SET balance = ? WHERE id = ?";
+		try (Connection c = Database.getInstance().getConnection();
+			 PreparedStatement ps = c.prepareStatement(sql)) {
+			ps.setBigDecimal(1, wallet.getBalance());
+			ps.setString(2, wallet.getId());
+			int rowsUpdated = ps.executeUpdate();
+			if (rowsUpdated > 0) {
+				LoggerProvider.getLogger(getClass().getName()).info("Balance mise à jour pour wallet: " + wallet.getId() + " -> " + wallet.getBalance());
+			}
+		} catch (SQLException e) {
+			LoggerProvider.getLogger(getClass().getName()).severe(e.getMessage());
+		}
+	}
 
 	@Override
 	public Optional<Wallet> findById(String id) {
@@ -42,10 +65,16 @@ public class JdbcWalletRepository implements repository.WalletRepository {
 			ps.setString(1, id);
 			try (ResultSet rs = ps.executeQuery()) {
 				if (rs.next()) {
+					String walletId = rs.getString("id");
 					CryptoType type = CryptoType.valueOf(rs.getString("type"));
 					String address = rs.getString("address");
-					Wallet w = type == CryptoType.BITCOIN ? new BitcoinWallet(address) : new EthereumWallet(address);
-					w.setBalance(rs.getBigDecimal("balance"));
+					BigDecimal balance = rs.getBigDecimal("balance");
+					java.time.Instant createdAt = rs.getTimestamp("created_at").toInstant();
+					
+					Wallet w = type == CryptoType.BITCOIN ? 
+						new BitcoinWallet(walletId, address, balance, createdAt) : 
+						new EthereumWallet(walletId, address, balance, createdAt);
+					
 					return Optional.of(w);
 				}
 			}
@@ -63,10 +92,16 @@ public class JdbcWalletRepository implements repository.WalletRepository {
 			ps.setString(1, address);
 			try (ResultSet rs = ps.executeQuery()) {
 				if (rs.next()) {
+					String walletId = rs.getString("id");
 					CryptoType type = CryptoType.valueOf(rs.getString("type"));
 					String addr = rs.getString("address");
-					Wallet w = type == CryptoType.BITCOIN ? new BitcoinWallet(addr) : new EthereumWallet(addr);
-					w.setBalance(rs.getBigDecimal("balance"));
+					BigDecimal balance = rs.getBigDecimal("balance");
+					java.time.Instant createdAt = rs.getTimestamp("created_at").toInstant();
+					
+					Wallet w = type == CryptoType.BITCOIN ? 
+						new BitcoinWallet(walletId, addr, balance, createdAt) : 
+						new EthereumWallet(walletId, addr, balance, createdAt);
+					
 					return Optional.of(w);
 				}
 			}
@@ -97,10 +132,16 @@ public class JdbcWalletRepository implements repository.WalletRepository {
 			 PreparedStatement ps = c.prepareStatement(sql);
 			 ResultSet rs = ps.executeQuery()) {
 			while (rs.next()) {
+				String walletId = rs.getString("id");
 				CryptoType type = CryptoType.valueOf(rs.getString("type"));
 				String address = rs.getString("address");
-				Wallet w = type == CryptoType.BITCOIN ? new BitcoinWallet(address) : new EthereumWallet(address);
-				w.setBalance(rs.getBigDecimal("balance"));
+				BigDecimal balance = rs.getBigDecimal("balance");
+				java.time.Instant createdAt = rs.getTimestamp("created_at").toInstant();
+				
+				Wallet w = type == CryptoType.BITCOIN ? 
+					new BitcoinWallet(walletId, address, balance, createdAt) : 
+					new EthereumWallet(walletId, address, balance, createdAt);
+				
 				list.add(w);
 			}
 		} catch (SQLException e) {
@@ -109,5 +150,3 @@ public class JdbcWalletRepository implements repository.WalletRepository {
 		return list;
 	}
 }
-
-
