@@ -53,21 +53,10 @@ cryptoWalletSimilator/
 │   │   ├── AddressGenerator.java
 │   │   ├── ValidationUtils.java
 │   │   └── LoggerProvider.java
-│   ├── test/                # Tests unitaires
-│   │   └── java/
-│   │       ├── metier/service/
-│   │       │   └── WalletServiceTest.java
-│   │       └── util/
-│   │           └── ValidationUtilsTest.java
 │   └── Lib/                 # Bibliothèques externes
 │       ├── postgresql-42.7.7.jar
-│       ├── junit-4.13.2.jar
-│       └── hamcrest-core-1.3.jar
 ├── sql/
-│   └── schema.sql          # Schéma base de données
-├── uml/                    # Diagrammes UML
-├── build/                  # Fichiers compilés
-├── dist/                   # JAR exécutable
+│   └── schema.sql          # Schéma base de données 
 └── README.md
 ```
 
